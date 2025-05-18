@@ -1,2 +1,249 @@
-<h1> 테스트</h1>
-<p> 반갑습니다람쥐</p>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>스터디룸 좌석 예약 시스템</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .login-container, .seat-container {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 360px;
+      margin-bottom: 20px;
+    }
+    .login-container h2, .seat-container h2 {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .input-box {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: none;
+      border-radius: 16px;
+      background: #e5e5e5;
+      font-size: 16px;
+    }
+    .remember {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .sign-btn, .reserve-btn, .cancel-btn, .back-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 20px;
+      background-color: #abc9ff;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .status {
+      font-size: 14px;
+      color: red;
+      margin-bottom: 10px;
+      height: 18px;
+    }
+    .hidden {
+      display: none;
+    }
+    .seats {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .seat {
+      width: 40px;
+      height: 40px;
+      background-color: #ccc;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .seat.selected {
+      background-color: #6cf;
+    }
+    .seat.reserved {
+      background-color: red;
+      pointer-events: none;
+    }
+  </style>
+  <script>
+    const validIds = [];
+    for (let g = 301; g <= 308; g++) {
+      for (let i = 1; i <= 28; i++) {
+        validIds.push(String(g * 100 + i));
+      }
+    }
+
+    const warnings = {
+      "30105": 1,
+      "30106": 0,
+      "30107": 3
+    };
+
+    const banDays = {
+      "30107": 3
+    };
+
+    let currentUser = null;
+    const reservedSeats = {};
+    const userSeatMap = {}; // 사용자별 예약 좌석 정보
+
+    function checkLogin() {
+      const id = document.getElementById("id").value;
+      const statusMsg = document.getElementById("status-msg");
+      const loginBox = document.getElementById("login-box");
+      const seatBox = document.getElementById("seat-box");
+      const userId = document.getElementById("user-id");
+
+      if (!validIds.includes(id)) {
+        statusMsg.innerText = "허용되지 않은 학번입니다.";
+        return;
+      }
+
+      if (banDays[id]) {
+        statusMsg.innerText = `'${id}'님은 ${banDays[id]}일 이용 정지 상태로 접속이 불가능합니다.`;
+        return;
+      } else if (warnings[id] > 0) {
+        statusMsg.innerText = `'${id}'님은 ${warnings[id]}회 경고 상태입니다.`;
+      } else {
+        statusMsg.innerText = "정상 로그인 되었습니다.";
+      }
+
+      currentUser = id;
+      loginBox.classList.add("hidden");
+      seatBox.classList.remove("hidden");
+      userId.innerText = id;
+      generateSeats();
+    }
+
+    function goBack() {
+      currentUser = null;
+      document.getElementById("login-box").classList.remove("hidden");
+      document.getElementById("seat-box").classList.add("hidden");
+      document.getElementById("id").value = "";
+      document.getElementById("status-msg").innerText = "";
+    }
+
+    function selectSeat(elem) {
+      if (userSeatMap[currentUser]) {
+        alert("이미 좌석을 예약하셨습니다.");
+        return;
+      }
+
+      const seats = document.querySelectorAll(".seat");
+      seats.forEach(s => s.classList.remove("selected"));
+      elem.classList.add("selected");
+    }
+
+    function reserveSeat() {
+      if (userSeatMap[currentUser]) {
+        alert("이미 좌석을 예약하셨습니다.");
+        return;
+      }
+
+      const selected = document.querySelector(".seat.selected");
+      if (!selected) {
+        alert("좌석을 선택해주세요.");
+        return;
+      }
+
+      if (reservedSeats[selected.innerText]) {
+        alert("이미 예약된 좌석입니다.");
+        return;
+      }
+
+      reservedSeats[selected.innerText] = currentUser;
+      userSeatMap[currentUser] = selected.innerText;
+
+      selected.classList.remove("selected");
+      selected.classList.add("reserved");
+      alert(`좌석 ${selected.innerText} 예약 완료!`);
+    }
+
+    function cancelReservation() {
+      const seatLabel = userSeatMap[currentUser];
+      if (!seatLabel) {
+        alert("예약된 좌석이 없습니다.");
+        return;
+      }
+
+      delete reservedSeats[seatLabel];
+      delete userSeatMap[currentUser];
+
+      const seatElem = [...document.querySelectorAll(".seat")].find(s => s.innerText === seatLabel);
+      if (seatElem) {
+        seatElem.classList.remove("reserved");
+        seatElem.onclick = function () { selectSeat(seatElem); };
+      }
+
+      alert(`좌석 ${seatLabel} 예약이 취소되었습니다.`);
+    }
+
+    function generateSeats() {
+      const seatContainer = document.querySelector(".seats");
+      seatContainer.innerHTML = "";
+      const labels = [];
+      const rows = ["A", "B", "C", "D", "E"];
+      const cols = [1, 2, 3, 4, 5, 6];
+
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < cols.length; c++) {
+          labels.push(rows[r] + cols[c]);
+        }
+      }
+
+      labels.forEach(label => {
+        const seat = document.createElement("div");
+        seat.className = "seat";
+        seat.innerText = label;
+        if (reservedSeats[label]) {
+          seat.classList.add("reserved");
+        } else {
+          seat.onclick = function () { selectSeat(seat); };
+        }
+        seatContainer.appendChild(seat);
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="login-container" id="login-box">
+    <h2>로그인</h2>
+    <input type="text" id="id" class="input-box" placeholder="ID">
+    <input type="password" class="input-box" placeholder="Password">
+    <div class="remember">
+      <input type="checkbox" id="remember" style="margin-right: 6px;">
+      <label for="remember">로그인 정보 저장</label>
+    </div>
+    <div class="status" id="status-msg"></div>
+    <button class="sign-btn" onclick="checkLogin()">Sign in</button>
+  </div>
+
+  <div class="seat-container hidden" id="seat-box">
+    <h2><span id="user-id"></span>님 좌석 예약</h2>
+    <div class="seats"></div>
+    <button class="reserve-btn" onclick="reserveSeat()">예약하기</button>
+    <button class="cancel-btn" onclick="cancelReservation()">예약 취소</button>
+    <button class="back-btn" onclick="goBack()">뒤로가기</button>
+  </div>
+</body>
+</html>
